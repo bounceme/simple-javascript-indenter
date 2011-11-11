@@ -1,8 +1,8 @@
 " Vim indent file
 " Language:	JavaScript
 " Maintainer:	JiangMiao <jiangfriend@gmail.com>
-" Last Change:  2011-07-24
-" Version: 1.4.3
+" Last Change:  2011-10-19
+" Version: 1.4.6
 " Homepage: http://www.vim.org/scripts/script.php?script_id=3227
 " Repository: https://github.com/jiangmiao/simple-javascript-indenter
 
@@ -35,9 +35,9 @@ if exists("*GetJsIndent")
   finish 
 endif
 
-let s:expr_left  = '[\[\{\(]'
-let s:expr_right = '[\)\}\]]'
-let s:expr_all   = '[\[\{\(\)\}\]]'
+let s:expr_left  = '[[{(]'
+let s:expr_right = '[)}\]]'
+let s:expr_all   = '[[{()}\]]'
 
 let s:expr_case          = '\s\+\(case\s\+[^\:]*\|default\)\s*:\s*'
 let s:expr_comment_start = '/\*c'
@@ -57,6 +57,8 @@ function! DoIndentPrev(ind,str)
   let mstr = matchstr(pline, '^'.s:expr_right.'*')
   let last = strlen(mstr)
   let start_with_expr_right = last
+  let ind_add = 0
+  let ind_dec = 0
   while 1
     let last=match(pline, s:expr_all, last)
     if last == -1
@@ -66,10 +68,10 @@ function! DoIndentPrev(ind,str)
     let last = last + 1
 
     if match(str, s:expr_left) != -1
-      let ind = ind + &sw
+      let ind_add += 1
     else
       if start_with_expr_right == 0
-        let ind = ind - &sw
+        let ind_dec += 1
       endif
     endif
 
@@ -78,16 +80,18 @@ function! DoIndentPrev(ind,str)
 
   "BriefMode
   if(g:SimpleJsIndenter_BriefMode) 
-    if(ind<a:ind)
-      let ind =  a:ind - &sw
+    if ind_add > 1
+      let ind_add = 1
     endif
-    if(ind>a:ind)
-      let ind =  a:ind + &sw
+
+    if ind_dec > 1
+      let ind_dec = 1
     endif
   endif
+  let ind = a:ind + (ind_add - ind_dec) * &sw
 
   if (match(' '.pline, s:expr_case)!=-1)
-    let ind = ind - &sw * g:SimpleJsIndenter_CaseIndentLevel
+    let ind = float2nr(ind - &sw * g:SimpleJsIndenter_CaseIndentLevel)
   endif
 
   if match(pline, s:expr_comment_start) != -1
@@ -143,7 +147,7 @@ function! DoIndent(ind, str, pline)
 
 
   if (match(' '.line, s:expr_case)!=-1)
-    let ind = ind + &sw * g:SimpleJsIndenter_CaseIndentLevel
+    let ind = float2nr(ind + &sw * g:SimpleJsIndenter_CaseIndentLevel)
   endif
 
   if (match(line, s:expr_comma_start) != -1)
@@ -166,81 +170,84 @@ endfunction
 
 " Remove strings and comments
 function! TrimLine(pline)
-  let line = substitute(a:pline, "\\\\\\\\", '_','g')
-  let line = substitute(line, "\\\\.", '_','g')
+  let line = substitute(a:pline, '\\\\', '_','g')
+  let line = substitute(line, '\\.', '_','g')
+  " One line comment
+  let line = substitute(line, '^\s*/\*.*\*/\s*$', '//c', 'g')
+  let line = substitute(line, '^\s*//.*$', '//c', 'g')
+  " remove all non ascii character
+  let line = substitute(line, '[^\x00-\x7f]', '', 'g')
 
   " Strings
   let new_line = ''
+  let sub_line = ''
   let min_pos = 0
   while 1 
-    let new_line = line
     let c = ''
     let base_pos = min_pos
-    let min_pos = -1
-    let pos = match(new_line, '''', base_pos)
-    if pos != -1 && (pos < min_pos||min_pos==-1)
-      let c = ''''
-      let min_pos = pos
-    endif
-    let pos = match(new_line, '"', base_pos)
-    if pos != -1 && (pos < min_pos||min_pos==-1)
-      let c = '"'
-      let min_pos = pos
-    endif
-    let pos = match(new_line, '/', base_pos)
-    if pos != -1 && (pos < min_pos||min_pos==-1)
-      let c = '/'
-      let min_pos = pos
-    endif
+    let min_pos = match(line, '[''"/]', base_pos)
     if min_pos == -1
+      let new_line .= strpart(line, base_pos)
       break
     endif
+    let c = line[min_pos]
+
+    let new_line .= strpart(line, base_pos, min_pos - base_pos)
+    let sub_line = ''
 
     if c == ''''
-      let new_line = substitute(new_line, "'[^']*'", '_','g')
-      let min_pos = min_pos + 1
+      let sub_line = matchstr(line, "^'.\\{-}'", min_pos)
+      if sub_line != ''
+        let new_line .= '_'
+      endif
     elseif c == '"'
-      let new_line = substitute(new_line, '"[^"]*"','_','g')
-      let min_pos = min_pos + 1
+      let sub_line = matchstr(line, '^".\{-}"', min_pos)
+      if sub_line != ''
+        let new_line .= '_'
+      endif
     elseif c == '/'
       " Skip all if match a comment
-      if new_line[min_pos+1] == '/' 
-        let new_line = substitute(new_line, '/.*', '', 'g')
-        let line = new_line
-        break
-      elseif new_line[min_pos+1] == '*'
-        let new_line = substitute(new_line, '/\*.\{-}\*/', '', 'g')
+      if line[min_pos+1] == '/' 
+        let sub_line = matchstr(line, '^/.*', min_pos)
+        if min_pos == 0 && sub_line != ''
+          let new_line = '//c'
+          break
+        endif
+      elseif line[min_pos+1] == '*'
+        let sub_line = matchstr(line, '^/\*.\{-}\*/', min_pos)
       else
-        let new_line = substitute(new_line, '/[^/]\+/','_','g')
-        let min_pos = min_pos + 1
+        " /.../ sometimes is not a regexp, (a / b); // c
+        let m = matchlist(line, '^\(/[^/]\+/\)\([^/]\|$\)', min_pos)
+        if len(m)
+          let new_line .= '_'
+          let sub_line = m[1]
+        endif
       endif
     endif
-    if(new_line==line)
-      break
+    if sub_line != ''
+      let min_pos = min_pos + strlen(sub_line)
+    else
+      let new_line .= c
+      let min_pos = min_pos + 1
     endif
-    let line = new_line
   endwhile
-  let line = substitute(line, "'.*'",'_', 'g')
-  let line = substitute(line, '".*"','_', 'g')
-
+  let line = new_line
+  
   " Comment
-  let line = substitute(line, "/\\*.\\{-}\\*/",'','g')
-  let line = substitute(line, '^\s*//.*$','//c','g')
-  let line = substitute(line, '[^/]//.*$','','')
   let line = substitute(line, '/\*.*$','/*c','')
   let line = substitute(line, '^.\{-}\*/','c*/','')
-  let line = substitute(line, '^\s*\*.*','','g')
+  let line = substitute(line, '^\s*\*.*','','')
 
   " Brackets
   let new_line = ''
   while new_line != line
     let new_line = line
-    let line = substitute(new_line,'\(([^\)\(]*)\|\[[^\]\[]*\]\|{[^\}\{]*}\)','_','g')
+    let line = substitute(line,'\(([^)(]*)\|\[[^\][]*\]\|{[^}{]*}\)','_','g')
   endwhile
-
+  
   " Trim Blank
-  " let line = substitute(line, '\(\w\+\)\s\+\(\W\+\)','\1\2','g')
-  let line = matchlist(line, "^\\s*\\(.\\{-}\\)\\s*$")[1]
+  let line = matchlist(line, '\s*\(.\{-}\)\s*$')[1]
+
   return line
 endfunction
 
@@ -248,8 +255,8 @@ function! s:GetLine(num)
   return TrimLine(getline(a:num))
 endfunction
 
-let s:expr_partial = '[\+\-\*\/\|\&\,]$'
-let s:expr_partial2 = '[\+\-\*\/\|\&]$'
+let s:expr_partial = '[+\-*/|&,]$'
+let s:expr_partial2 = '[+\-*/|&]$'
 function! s:IsPartial(line)
   " Add IndentLoose for
   " function a() {
@@ -263,11 +270,12 @@ function! s:IsPartial(line)
 endfunction
 
 function! s:IsComment(line)
-  return match(line, '^//.*$') != -1
+  return a:line =~ '^\s*//' || a:line =~ '^\s*/\*.*\*/\s*$'
 endfunction
 function! s:SearchBack(num)
   let num = a:num
   let new_num = num
+  let partial = 0
   while 1
     if new_num == 0
       break
@@ -276,8 +284,14 @@ function! s:SearchBack(num)
     if !s:IsComment(line)
       let line = TrimLine(line)
       if !s:IsPartial(line)
+        if partial > 0
+          " Store line number to last partial
+          let num = partial
+        endif
         break
       endif
+      " Save the partial postion
+      let partial = new_num
       if match(line, s:expr_all)!=-1
         let num = new_num
         break
@@ -292,14 +306,14 @@ endfunction
 function! s:AssignIndent(line)
   let ind = 0
   let line = a:line
-  let line = matchlist(line, "^\\s*\\(.\\{-}\\)\\s*$")[1]
+  let line = matchlist(line, '^\s*\(.\{-}\)\s*$')[1]
 
   if(match(line,'.*=.*'.s:expr_partial2) != -1)
     return ind + strlen(matchstr(line, '.*=\s*'))
-  elseif(match(line,'var\s\+.*=\s*') != -1)
-    return ind + strlen(matchstr(line, 'var\s\+'))
-  elseif(match(line,'var\s\+') != -1)
-    return ind + strlen(matchstr(line, 'var\s\+'))
+  elseif(match(line,'\(var\|return\)\s\+.*=\s*') != -1)
+    return ind + strlen(matchstr(line, '\(var\|return\)\s\+'))
+  elseif(match(line,'\(var\|return\)\s\+') != -1)
+    return ind + strlen(matchstr(line, '\(var\|return\)\s\+'))
   elseif(match(line,'^\w\s\+=\s*.*[^,]$') != -1)
     return ind + strlen(matchstr(line, '^\w\s\+=\s*'))
   endif
@@ -315,12 +329,12 @@ function DoIndentAssign(ind, line)
 endfunction
 
 function! s:IsOneLineIndent(line)
-  return match(a:line, '^[\}\)\]]*\s*\(if\|else\|while\|try\|catch\|finally\|for\|else\s\+if\)\s*_\=$') != -1
+  return match(a:line, '^[})\]]*\s*\(if\|else\|while\|try\|catch\|finally\|for\|else\s\+if\)\s*_\=$') != -1
 endfunction
 
 function! s:IsOneLineIndentLoose(line)
   " _\= equal _? in PCRE
-  return match(a:line, '^[\}\)\]]*\s*\(if\|else\|while\|try\|catch\|finally\|for\|else\s\+if\)') != -1
+  return match(a:line, '^[})\]]*\s*\(if\|else\|while\|try\|catch\|finally\|for\|else\s\+if\)') != -1
 endfunction
 
 
@@ -334,7 +348,7 @@ function! GetJsIndent()
   let ppnum = prevnonblank(pnum - 1)
   let ppline = s:GetLine(ppnum)
 
-  if (s:IsPartial(pline) && pnum == v:lnum-1)||match(pline, s:expr_left)!=-1
+  if ((s:IsPartial(pline)||s:IsComment(pline)) && pnum == v:lnum-1)||match(pline, s:expr_left)!=-1
     let pnum = s:SearchBack(pnum)
     let ind = indent(pnum)
     let pline = s:GetLine(pnum)
@@ -345,9 +359,18 @@ function! GetJsIndent()
       endif
     endif
   else
-    if s:IsPartial(ppline) && ppnum == pnum-1
+    let fix = 1
+    " Ignore the comments
+    while s:IsComment(ppline)
+      let ppnum = prevnonblank(ppnum-1)
+      let ppline = s:GetLine(ppnum)
+      let fix += 1
+    endwhile
+
+    if s:IsPartial(ppline) && ppnum == pnum- fix
       let pnum =  s:SearchBack(ppnum)
     endif
+
     let ind = indent(pnum)
     let pline = s:GetLine(pnum)
     let ind = DoIndentPrev(ind, pline)
