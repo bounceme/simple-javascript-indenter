@@ -1,3 +1,23 @@
+About this fork
+====
+This fork mainly fix the start with comma style.
+
+```javascript
+var a = a
+  , b = b
+  ;
+
+{
+  a : a
+, b : b
+, c : c
+, d : {
+    e : e
+  , f : f
+  }
+}
+```
+
 Simply Javascript Indenter
 ==========================
 A simple vim indent plugin for javascript, support OOP, jquery
