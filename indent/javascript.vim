@@ -51,13 +51,14 @@ let s:expr_comma_start = '^\s*,'
 let s:expr_var = '^\s*var\s'
 let s:expr_var_stop = ';'
 
-let s:expr_op_start = '^\s*\(\.\|+ \|&&\|||\)'
+let s:expr_op_start = '^\s*\(\.\|[+\-] \|&&\|||\)'
+let s:expr_end_closure = '^\s*\})\s*$'
 
 " add $ to Fix 
 " ;(function() {
 "   something;
 " })
-let s:expr_semic_start = '^\s*;\s*$'
+let s:expr_single_semicolon = '^\s*;\s*$'
 
 " Check prev line
 function! DoIndentPrev(ind,str) 
@@ -128,7 +129,7 @@ function! DoIndentPrev(ind,str)
   endif
 
   " buggy
-  if match(pline, s:expr_semic_start) != -1
+  if match(pline, s:expr_single_semicolon) != -1
     let ind = ind - 2
   endif
 
@@ -179,24 +180,25 @@ function! DoIndent(ind, str, pline)
   endif
 
   " a
-  "   .foo <-
+  "   .foo({ <-
+  "    })
   "   .bar <-
   if (match(line, s:expr_op_start) != -1)
-    if (match(pline, s:expr_op_start) == -1)
-      let ind = ind + &sw
+    if ((match(pline, s:expr_op_start) == -1) && (match(pline, s:expr_end_closure) == -1))
+      let ind = ind + 2
     endif
   endif
 
   " a
   "   .bar
   " newline <-
-  if (match(pline, s:expr_op_start) != -1)
-    if (match(line, s:expr_op_start) == -1)
-      let ind = ind - &sw
-    endif
-  endif
+  " if (match(pline, s:expr_op_start) != -1)
+  "   if (match(line, s:expr_op_start) == -1)
+  "     let ind = ind - 2
+  "   endif
+  " endif
 
-  if (match(line, s:expr_semic_start) != -1 && match(pline, s:expr_comma_start) != -1)
+  if (match(line, s:expr_single_semicolon) != -1 && match(pline, s:expr_comma_start) != -1)
     let ind = ind - 2
   endif
 

@@ -214,51 +214,56 @@
 }
 
 var a = a
-  , b = b
-  , c = c;
+  , b = c
 
 var a = a
-  , b = c
+  , b = b
+  , c = c;
 
 var a = a
   , b = b
   ;
 
 foo({
-    a : a
-  , b : b
-  , c : c
-  , d : {
-        e : e
-      , f : f
-    }
-  , g : {[
-        h : h
-      , i : i
-    ]}
+        a : a
+      , b : b
+      , c : c
+      , d : {
+            e : e
+          , f : f
+        }
+      , g : {[
+                h : h
+              , i : i
+        ]}
 });
 
 foo()
   .foo
   .ff
+  ;
 
 bar()
   .foo
-  .bar
+  .bar(function(){
+
+  })
+  ;
 
 if( a == b
-    && c == d
-    && e == f
-    || g == h
-    || i == j ) {
+      && c == d
+      && e == f
+      || g == h
+      || i == j ) {
+      a = b
+        + c
+        - d
+        ;
 
-  a = b
-    + c
-    + d
-
-  a = b
-    + c
-    + d
-}
-
-
+      a = b
+        + c
+        - d
+        * xx
+        / asdf
+        ;
+  }
