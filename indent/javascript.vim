@@ -296,8 +296,8 @@ function! s:GetLine(num)
   return TrimLine(getline(a:num))
 endfunction
 
-let s:expr_partial = '[+\-*/|&,]$'
-let s:expr_partial2 = '[+\-*/|&]$'
+let s:expr_partial = '[+?:\-*/|&,]$'
+let s:expr_partial2 = '[+?:\-*/|&]$'
 function! s:IsPartial(line)
   " Add IndentLoose for
   " function a() {
