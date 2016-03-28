@@ -350,13 +350,13 @@ function! s:AssignIndent(line)
   let line = matchlist(line, '^\s*\(.\{-}\)\s*$')[1]
 
   if(match(line,'.*=.*'.s:expr_partial2) != -1)
-    return ind + strlen(matchstr(line, '.*=\s*'))
+    return ind + &sw
   elseif(match(line,'\(var\|return\)\s\+.*=\s*') != -1)
-    return ind + strlen(matchstr(line, '\(var\|return\)\s\+'))
+    return ind + &sw
   elseif(match(line,'\(var\|return\)\s\+') != -1)
-    return ind + strlen(matchstr(line, '\(var\|return\)\s\+'))
+    return ind + &sw
   elseif(match(line,'^\w\s\+=\s*.*[^,]$') != -1)
-    return ind + strlen(matchstr(line, '^\w\s\+=\s*'))
+    return ind + &sw
   endif
   return ind
 endfunction
